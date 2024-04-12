@@ -14,6 +14,7 @@ import {
   fetchCreatorKeypair,
   fetchFeePayerKeypair,
   fetchLeafOwnerKeypair,
+  getSimulationUnits,
   log,
 } from "./utils";
 import {
@@ -22,6 +23,10 @@ import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   getAssociatedTokenAddress,
 } from "@solana/spl-token";
+import Debug from "debug";
+
+const computeLog = Debug("compute:");
+const txIdLog = Debug("txId:");
 
 describe("bubblegum-cpi", () => {
   // Configure the client to use the local cluster.
@@ -56,19 +61,22 @@ describe("bubblegum-cpi", () => {
     );
     log("treeAuthority", treeAuthority.toBase58());
 
-    const txId = await program.methods
+    let transaction = new anchor.web3.Transaction();
+
+    let accIx = anchor.web3.SystemProgram.createAccount({
+      fromPubkey: creator.publicKey,
+      newAccountPubkey: merkleTree.publicKey,
+      lamports: await provider.connection.getMinimumBalanceForRentExemption(
+        merkleTreeSize
+      ),
+      space: merkleTreeSize,
+      programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+    });
+
+    transaction.add(accIx);
+
+    let createTreeIx = await program.methods
       .createTree(maxDepth, maxBufferSize, null)
-      .preInstructions([
-        anchor.web3.SystemProgram.createAccount({
-          fromPubkey: creator.publicKey,
-          newAccountPubkey: merkleTree.publicKey,
-          lamports: await provider.connection.getMinimumBalanceForRentExemption(
-            merkleTreeSize
-          ),
-          space: merkleTreeSize,
-          programId: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
-        }),
-      ])
       .accounts({
         treeAuthority,
         merkleTree: merkleTree.publicKey,
@@ -79,10 +87,29 @@ describe("bubblegum-cpi", () => {
         mplBubblegumProgram: MPL_BUBBLEGUM_PROGRAM_ID,
         systemProgram: anchor.web3.SystemProgram.programId,
       })
-      .signers([merkleTree, creator, feePayer])
-      .rpc({ commitment: "confirmed", skipPreflight: true });
+      .instruction();
 
-    log("Create Bubblegum tree", txId);
+    // Simulate transaction to calculate the compute units
+    let units = await getSimulationUnits(
+      provider.connection,
+      [accIx, createTreeIx],
+      creator.publicKey
+    );
+
+    computeLog("Compute units required to create bubblegum tree ", units);
+
+    transaction.add(createTreeIx);
+
+    const txId = await provider.sendAndConfirm(
+      transaction,
+      [merkleTree, creator, feePayer],
+      {
+        commitment: "confirmed",
+        skipPreflight: true,
+      }
+    );
+
+    txIdLog(txId);
 
     const uri = "https://example.com/my-collection.json";
     const name = "My Collection";
@@ -117,7 +144,9 @@ describe("bubblegum-cpi", () => {
     log("Ata ", ata.toBase58());
 
     try {
-      let colTxId = await program.methods
+      transaction = new anchor.web3.Transaction();
+
+      let collectionNftIx = await program.methods
         .createCollectionNft(uri, name)
         .accounts({
           collectionMint: collectionMint.publicKey,
@@ -132,10 +161,32 @@ describe("bubblegum-cpi", () => {
           rent: anchor.web3.SYSVAR_RENT_PUBKEY,
           associatedProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         })
-        .preInstructions([computeBudgetIx])
-        .signers([creator, collectionMint])
-        .rpc({ commitment: "confirmed", skipPreflight: true });
-      log("Create collection mint", colTxId);
+        .instruction();
+
+      // Simulate transaction to calculate the compute units
+      units = await getSimulationUnits(
+        provider.connection,
+        [collectionNftIx],
+        creator.publicKey
+      );
+
+      computeLog("Compute units required for collectionNft ix", units);
+
+      let computeIx = computeBudgetIx(units);
+
+      transaction.add(computeIx);
+
+      transaction.add(collectionNftIx);
+
+      const collectionTxId = await provider.sendAndConfirm(
+        transaction,
+        [creator, collectionMint],
+        {
+          commitment: "confirmed",
+          skipPreflight: true,
+        }
+      );
+      txIdLog(collectionTxId);
     } catch (error) {
       log("Error ", error);
     }
@@ -143,7 +194,10 @@ describe("bubblegum-cpi", () => {
     try {
       const uri = "https://example.com/my-collection-cNft.json";
       const name = "My Collection cNFT 1";
-      let mintToColTxId = await program.methods
+
+      transaction = new anchor.web3.Transaction();
+
+      let mintToCollectionIx = await program.methods
         .mintCompNftToCollection(uri, name)
         .accounts({
           treeConfig: treeAuthority,
@@ -162,10 +216,28 @@ describe("bubblegum-cpi", () => {
           systemProgram: anchor.web3.SystemProgram.programId,
           mplBubblegumProgram: MPL_BUBBLEGUM_PROGRAM_ID,
         })
-        // .preInstructions([computeBudgetIx])
-        .signers([creator, feePayer])
-        .rpc({ commitment: "confirmed", skipPreflight: true });
-      log("Mint to collection cNFT", mintToColTxId);
+        .instruction();
+
+      // Simulate transaction to calculate the compute units
+      units = await getSimulationUnits(
+        provider.connection,
+        [mintToCollectionIx],
+        creator.publicKey
+      );
+
+      computeLog("Compute units required for mint to collection ix", units);
+
+      transaction.add(mintToCollectionIx);
+
+      const mintToColTxId = await provider.sendAndConfirm(
+        transaction,
+        [creator, feePayer],
+        {
+          commitment: "confirmed",
+          skipPreflight: true,
+        }
+      );
+      txIdLog(mintToColTxId);
     } catch (error) {
       log("mint to collection error ", error);
     }

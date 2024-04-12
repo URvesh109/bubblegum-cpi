@@ -81,7 +81,39 @@ export const { assert, expect } = chai;
 
 const COMPUTE_UNITS = 500_000;
 
-export const computeBudgetIx =
+export const computeBudgetIx = (units = COMPUTE_UNITS) =>
   anchor.web3.ComputeBudgetProgram.setComputeUnitLimit({
-    units: COMPUTE_UNITS,
+    units,
   });
+
+export async function getSimulationUnits(
+  connection: anchor.web3.Connection,
+  instructions: anchor.web3.TransactionInstruction[],
+  payer: anchor.web3.PublicKey
+): Promise<number | undefined> {
+  const testInstructions = [
+    anchor.web3.ComputeBudgetProgram.setComputeUnitLimit({
+      units: COMPUTE_UNITS,
+    }),
+    ...instructions,
+  ];
+
+  const testVersionedTxn = new anchor.web3.VersionedTransaction(
+    new anchor.web3.TransactionMessage({
+      instructions: testInstructions,
+      payerKey: payer,
+      recentBlockhash: anchor.web3.PublicKey.default.toString(),
+    }).compileToV0Message()
+  );
+
+  const simulation = await connection.simulateTransaction(testVersionedTxn, {
+    replaceRecentBlockhash: true,
+    sigVerify: false,
+  });
+
+  if (simulation.value.err) {
+    return undefined;
+  }
+
+  return simulation.value.unitsConsumed;
+}
