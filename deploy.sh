@@ -3,6 +3,7 @@ set -euo pipefail
 
 solana airdrop --keypair keypairs/creator.json 100
 solana airdrop --keypair keypairs/leaf-owner.json 100
+solana airdrop --keypair keypairs/fee-payer.json 100
 
 anchor build --arch sbf
 

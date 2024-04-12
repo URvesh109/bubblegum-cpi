@@ -13,10 +13,12 @@ import {
   computeBudgetIx,
   fetchCreatorKeypair,
   fetchFeePayerKeypair,
+  fetchLeafOwnerKeypair,
   log,
 } from "./utils";
 import {
-  TOKEN_2022_PROGRAM_ID,
+  // TOKEN_2022_PROGRAM_ID, mpl_bubblegum program dosen't support yet
+  TOKEN_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
   getAssociatedTokenAddress,
 } from "@solana/spl-token";
@@ -33,14 +35,18 @@ describe("bubblegum-cpi", () => {
     const maxBufferSize = 8;
 
     const creator = fetchCreatorKeypair();
-    log("Creator ", creator.publicKey.toBase58());
+
     const feePayer = fetchFeePayerKeypair();
-    log("feePayer", feePayer.publicKey.toBase58());
+
+    const leafOwner = fetchLeafOwnerKeypair();
 
     await airdrop(provider, creator.publicKey, feePayer.publicKey);
 
     const merkleTree = anchor.web3.Keypair.generate();
     log("MerkleTree", merkleTree.publicKey.toBase58());
+
+    const collectionMint = anchor.web3.Keypair.generate();
+    log("collectionMint", collectionMint.publicKey.toBase58());
 
     const merkleTreeSize = getMerkleTreeSize(maxDepth, maxBufferSize);
 
@@ -74,15 +80,12 @@ describe("bubblegum-cpi", () => {
         systemProgram: anchor.web3.SystemProgram.programId,
       })
       .signers([merkleTree, creator, feePayer])
-      .rpc();
+      .rpc({ commitment: "confirmed", skipPreflight: true });
 
     log("Create Bubblegum tree", txId);
 
     const uri = "https://example.com/my-collection.json";
     const name = "My Collection";
-
-    const collectionMint = anchor.web3.Keypair.generate();
-    log("collectionMint", collectionMint.publicKey.toBase58());
 
     const tokenMetadata = anchor.web3.PublicKey.findProgramAddressSync(
       [
@@ -109,7 +112,7 @@ describe("bubblegum-cpi", () => {
       collectionMint.publicKey,
       creator.publicKey,
       false,
-      TOKEN_2022_PROGRAM_ID
+      TOKEN_PROGRAM_ID
     );
     log("Ata ", ata.toBase58());
 
@@ -124,17 +127,47 @@ describe("bubblegum-cpi", () => {
           masterEdition,
           associatedToken: ata,
           tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
-          tokenProgram: TOKEN_2022_PROGRAM_ID,
+          tokenProgram: TOKEN_PROGRAM_ID,
           systemProgram: anchor.web3.SystemProgram.programId,
           rent: anchor.web3.SYSVAR_RENT_PUBKEY,
           associatedProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         })
         .preInstructions([computeBudgetIx])
         .signers([creator, collectionMint])
-        .rpc();
+        .rpc({ commitment: "confirmed", skipPreflight: true });
       log("Create collection mint", colTxId);
     } catch (error) {
       log("Error ", error);
+    }
+
+    try {
+      const uri = "https://example.com/my-collection-cNft.json";
+      const name = "My Collection cNFT 1";
+      let mintToColTxId = await program.methods
+        .mintCompNftToCollection(uri, name)
+        .accounts({
+          treeConfig: treeAuthority,
+          leafOwner: leafOwner.publicKey,
+          leafDelegate: leafOwner.publicKey,
+          merkleTree: merkleTree.publicKey,
+          payer: feePayer.publicKey,
+          treeCreator: creator.publicKey,
+          collectionAuthority: creator.publicKey,
+          collectionMint: collectionMint.publicKey,
+          collectionMetadata: tokenMetadata,
+          editionAccount: masterEdition,
+          logWrapper: SPL_NOOP_PROGRAM_ID,
+          compressionProgram: SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+          tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
+          systemProgram: anchor.web3.SystemProgram.programId,
+          mplBubblegumProgram: MPL_BUBBLEGUM_PROGRAM_ID,
+        })
+        // .preInstructions([computeBudgetIx])
+        .signers([creator, feePayer])
+        .rpc({ commitment: "confirmed", skipPreflight: true });
+      log("Mint to collection cNFT", mintToColTxId);
+    } catch (error) {
+      log("mint to collection error ", error);
     }
   });
 });
