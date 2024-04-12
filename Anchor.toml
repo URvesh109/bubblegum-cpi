@@ -16,4 +16,4 @@ wallet = "keypairs/creator.json"
 
 [scripts]
 test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"
-mint = "DEBUG=log:* yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/bubblegum-cpi.ts"
+mint = "DEBUG='log:*,compute:*,txId:*' yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/bubblegum-cpi.ts"
