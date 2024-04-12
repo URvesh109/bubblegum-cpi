@@ -1,7 +1,8 @@
 use anchor_lang::prelude::*;
 use anchor_spl::{
+    associated_token::{get_associated_token_address_with_program_id, AssociatedToken},
     metadata::mpl_token_metadata::{
-        instructions::CreateV1CpiBuilder,
+        instructions::{CreateV1CpiBuilder, MintV1CpiBuilder},
         types::{PrintSupply, TokenStandard},
     },
     token_2022::Token2022,
@@ -76,6 +77,22 @@ pub mod bubblegum_cpi {
 
         create_cpi.invoke()?;
 
+        let mut mint_cpi = MintV1CpiBuilder::new(&all.token_metadata_program);
+        mint_cpi.token(&all.associated_token);
+        mint_cpi.token_owner(Some(&all.wallet));
+        mint_cpi.metadata(&all.token_metadata);
+        mint_cpi.master_edition(Some(&all.master_edition));
+        mint_cpi.mint(&all.collection_mint);
+        mint_cpi.payer(&all.payer);
+        mint_cpi.authority(&all.wallet);
+        mint_cpi.system_program(&all.system_program);
+        mint_cpi.sysvar_instructions(&rent_info);
+        mint_cpi.spl_token_program(&all.token_program);
+        mint_cpi.spl_ata_program(&all.associated_program);
+        mint_cpi.amount(1);
+
+        mint_cpi.invoke()?;
+
         Ok(())
     }
 }
@@ -119,9 +136,16 @@ pub struct CreateCollectionNft<'info> {
         constraint = master_edition.data_is_empty() @ BubblegumCpiError::MasterEditionAccountAlreadyInUse
     )]
     pub master_edition: UncheckedAccount<'info>,
+    ///CHECK: Associated token account
+    #[account(
+        mut,
+        address = get_associated_token_address_with_program_id(wallet.key, collection_mint.key, token_program.key) @ BubblegumCpiError::InvalidAssociatedTokenAccount
+    )]
+    pub associated_token: UncheckedAccount<'info>,
     pub token_metadata_program: Program<'info, TokenMetadataProgram>,
     pub token_program: Program<'info, Token2022>,
     pub system_program: Program<'info, System>,
+    pub associated_program: Program<'info, AssociatedToken>,
     pub rent: Sysvar<'info, Rent>,
 }
 
@@ -139,6 +163,8 @@ pub enum BubblegumCpiError {
     InvalidUri,
     #[msg("Nft name is invalid")]
     InvalidNftName,
+    #[msg("Associated token account is invalid")]
+    InvalidAssociatedTokenAccount,
 }
 
 #[derive(Clone)]
