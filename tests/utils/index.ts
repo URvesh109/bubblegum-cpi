@@ -5,7 +5,26 @@ import chaiAsPromised from "chai-as-promised";
 import Debug from "debug";
 import * as path from "path";
 
+export const METADATA_SEED = "metadata";
+export const EDITION_SEED = "edition";
+
 export const log = Debug("log:");
+
+export const MPL_BUBBLEGUM_PROGRAM_ID = new anchor.web3.PublicKey(
+  "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY"
+);
+
+export const SPL_NOOP_PROGRAM_ID = new anchor.web3.PublicKey(
+  "noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV"
+);
+
+export const SPL_ACCOUNT_COMPRESSION_PROGRAM_ID = new anchor.web3.PublicKey(
+  "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK"
+);
+
+export const TOKEN_METADATA_PROGRAM_ID = new anchor.web3.PublicKey(
+  "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+);
 
 export const fetchCreatorKeypair = (): anchor.web3.Keypair => {
   const creator = keypairFromFile(

@@ -3,23 +3,18 @@ import { Program } from "@coral-xyz/anchor";
 import { BubblegumCpi } from "../target/types/bubblegum_cpi";
 import { getMerkleTreeSize } from "@metaplex-foundation/mpl-bubblegum";
 import {
+  EDITION_SEED,
+  METADATA_SEED,
+  MPL_BUBBLEGUM_PROGRAM_ID,
+  SPL_ACCOUNT_COMPRESSION_PROGRAM_ID,
+  SPL_NOOP_PROGRAM_ID,
+  TOKEN_METADATA_PROGRAM_ID,
   airdrop,
   fetchCreatorKeypair,
   fetchFeePayerKeypair,
   log,
 } from "./utils";
-
-const MPL_BUBBLEGUM_PROGRAM_ID = new anchor.web3.PublicKey(
-  "BGUMAp9Gq7iTEuizy4pqaxsTyUCBK68MDfK752saRPUY"
-);
-
-const SPL_NOOP_PROGRAM_ID = new anchor.web3.PublicKey(
-  "noopb9bkMVfRPU8AsbpTUg8AQkHtKwMYZiFUjNRtMmV"
-);
-
-const SPL_ACCOUNT_COMPRESSION_PROGRAM_ID = new anchor.web3.PublicKey(
-  "cmtDvXumGCrqC1Age74AVPhSRVXJMd8PJS91L8KbNCK"
-);
+import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 
 describe("bubblegum-cpi", () => {
   // Configure the client to use the local cluster.
@@ -77,5 +72,54 @@ describe("bubblegum-cpi", () => {
       .rpc();
 
     console.log("Transaction id ", txId);
+
+    const uri = "https://example.com/my-collection.json";
+    const name = "My Collection";
+
+    const collectionMint = anchor.web3.Keypair.generate();
+    log("collectionMint", collectionMint.publicKey.toBase58());
+
+    const tokenMetadata = anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        Buffer.from(METADATA_SEED),
+        TOKEN_METADATA_PROGRAM_ID.toBuffer(),
+        collectionMint.publicKey.toBuffer(),
+      ],
+      TOKEN_METADATA_PROGRAM_ID
+    )[0];
+    log("tokenMetadata ", tokenMetadata.toBase58());
+
+    const masterEdition = anchor.web3.PublicKey.findProgramAddressSync(
+      [
+        Buffer.from(METADATA_SEED),
+        TOKEN_METADATA_PROGRAM_ID.toBuffer(),
+        collectionMint.publicKey.toBuffer(),
+        Buffer.from(EDITION_SEED),
+      ],
+      TOKEN_METADATA_PROGRAM_ID
+    )[0];
+    log("masterEdition ", masterEdition.toBase58());
+
+    try {
+      let colTxId = await program.methods
+        .createCollectionNft(uri, name)
+        .accounts({
+          collectionMint: collectionMint.publicKey,
+          payer: creator.publicKey,
+          wallet: creator.publicKey,
+          tokenMetadata,
+          masterEdition,
+          tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
+          tokenProgram: TOKEN_2022_PROGRAM_ID,
+          systemProgram: anchor.web3.SystemProgram.programId,
+          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+        })
+        .signers([creator, collectionMint])
+        .rpc();
+
+      log("colTxId", colTxId);
+    } catch (error) {
+      log("Error ", error);
+    }
   });
 });
