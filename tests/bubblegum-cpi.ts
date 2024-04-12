@@ -10,11 +10,16 @@ import {
   SPL_NOOP_PROGRAM_ID,
   TOKEN_METADATA_PROGRAM_ID,
   airdrop,
+  computeBudgetIx,
   fetchCreatorKeypair,
   fetchFeePayerKeypair,
   log,
 } from "./utils";
-import { TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
+import {
+  TOKEN_2022_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddress,
+} from "@solana/spl-token";
 
 describe("bubblegum-cpi", () => {
   // Configure the client to use the local cluster.
@@ -71,7 +76,7 @@ describe("bubblegum-cpi", () => {
       .signers([merkleTree, creator, feePayer])
       .rpc();
 
-    console.log("Transaction id ", txId);
+    log("Create Bubblegum tree", txId);
 
     const uri = "https://example.com/my-collection.json";
     const name = "My Collection";
@@ -100,6 +105,14 @@ describe("bubblegum-cpi", () => {
     )[0];
     log("masterEdition ", masterEdition.toBase58());
 
+    const ata = await getAssociatedTokenAddress(
+      collectionMint.publicKey,
+      creator.publicKey,
+      false,
+      TOKEN_2022_PROGRAM_ID
+    );
+    log("Ata ", ata.toBase58());
+
     try {
       let colTxId = await program.methods
         .createCollectionNft(uri, name)
@@ -109,15 +122,17 @@ describe("bubblegum-cpi", () => {
           wallet: creator.publicKey,
           tokenMetadata,
           masterEdition,
+          associatedToken: ata,
           tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
           tokenProgram: TOKEN_2022_PROGRAM_ID,
           systemProgram: anchor.web3.SystemProgram.programId,
           rent: anchor.web3.SYSVAR_RENT_PUBKEY,
+          associatedProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
         })
+        .preInstructions([computeBudgetIx])
         .signers([creator, collectionMint])
         .rpc();
-
-      log("colTxId", colTxId);
+      log("Create collection mint", colTxId);
     } catch (error) {
       log("Error ", error);
     }

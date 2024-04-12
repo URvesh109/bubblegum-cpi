@@ -70,3 +70,10 @@ export async function airdrop(
 chai.use(chaiAsPromised);
 
 export const { assert, expect } = chai;
+
+const COMPUTE_UNITS = 500_000;
+
+export const computeBudgetIx =
+  anchor.web3.ComputeBudgetProgram.setComputeUnitLimit({
+    units: COMPUTE_UNITS,
+  });
