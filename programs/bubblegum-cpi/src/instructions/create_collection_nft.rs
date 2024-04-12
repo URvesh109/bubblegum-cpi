@@ -9,6 +9,7 @@ use anchor_spl::{
     token::Token,
 };
 
+/// If you do not have a Collection NFT yet, you can create one using the ix
 pub(crate) fn handle_create_collection_nft(
     ctx: Context<CreateCollectionNftCpi>,
     uri: String,

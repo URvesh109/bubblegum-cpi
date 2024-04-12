@@ -3,6 +3,7 @@ use anchor_lang::prelude::*;
 use mpl_bubblegum::instructions::CreateTreeConfigCpiBuilder;
 use spl_account_compression::{program::SplAccountCompression, Noop};
 
+/// This instruction creates a Merkle Tree.
 pub(crate) fn handle_create_tree(
     ctx: Context<CreateTreeCpi>,
     max_depth: u32,

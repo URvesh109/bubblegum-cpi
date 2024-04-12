@@ -5,6 +5,7 @@ use mpl_bubblegum::instructions::MintToCollectionV1CpiBuilder;
 use mpl_bubblegum::types::{Collection, Creator, MetadataArgs};
 use spl_account_compression::{program::SplAccountCompression, Noop};
 
+/// This instruction mints a cNFT as a verified member of a collection. Note that Merkle proofs are not required for minting.
 pub(crate) fn hanlde_mint_comp_nft_to_collection(
     ctx: Context<MintCnftToCollectionCpi>,
     uri: String,
