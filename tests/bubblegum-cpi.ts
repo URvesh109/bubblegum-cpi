@@ -16,6 +16,7 @@ import {
   fetchFeePayerKeypair,
   fetchLeafOwnerKeypair,
   getSimulationUnits,
+  isBlockhashExpired,
   log,
 } from "./utils";
 import {
@@ -31,14 +32,14 @@ import { ComputeBudgetProgram } from "@solana/web3.js";
 const computeLog = Debug("compute:");
 const txIdLog = Debug("txId:");
 
-describe("bubblegum-cpi", () => {
+describe("bubblegum-cpi use to create tree, create collection mint and mint cNFT to collection", () => {
   // Configure the client to use the local cluster.
   const provider = anchor.AnchorProvider.env();
   anchor.setProvider(provider);
 
   const program = anchor.workspace.BubblegumCpi as Program<BubblegumCpi>;
 
-  it("Is initialized tree!", async () => {
+  it("Is initialized tree, collection mint and mint cNFT", async () => {
     const maxDepth = 3;
     const maxBufferSize = 8;
 
@@ -116,6 +117,21 @@ describe("bubblegum-cpi", () => {
       });
 
       transaction.add(priorityFeeInstruction);
+    }
+    const blockResponse =
+      await provider.connection.getLatestBlockhashAndContext({
+        commitment: "finalized",
+      });
+
+    const status = await isBlockhashExpired(
+      provider.connection,
+      blockResponse.value.lastValidBlockHeight
+    );
+
+    if (status) {
+      transaction.recentBlockhash = blockResponse.value.blockhash;
+      transaction.lastValidBlockHeight =
+        blockResponse.value.lastValidBlockHeight;
     }
 
     const txId = await provider.sendAndConfirm(

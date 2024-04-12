@@ -159,3 +159,24 @@ export async function fetchEstimatePriorityFees({
   const data: ResponseData = (await response.json()) as ResponseData;
   return data;
 }
+
+export async function isBlockhashExpired(
+  connection: anchor.web3.Connection,
+  lastValidBlockHeight: number
+) {
+  let currentBlockHeight = await connection.getBlockHeight("finalized");
+  console.log("                           ");
+  console.log("Current Block height:             ", currentBlockHeight);
+  console.log(
+    "Last Valid Block height - 150:     ",
+    lastValidBlockHeight - 150
+  );
+  console.log("--------------------------------------------");
+  console.log(
+    "Difference:                      ",
+    currentBlockHeight - (lastValidBlockHeight - 150)
+  ); // If Difference is positive, blockhash has expired.
+  console.log("                           ");
+
+  return currentBlockHeight > lastValidBlockHeight - 150;
+}
