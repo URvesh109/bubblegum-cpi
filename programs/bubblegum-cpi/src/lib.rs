@@ -1,6 +1,17 @@
 use anchor_lang::prelude::*;
-use mpl_bubblegum::{instructions::CreateTreeConfigCpiBuilder, programs::MPL_BUBBLEGUM_ID};
+use anchor_spl::{
+    metadata::mpl_token_metadata::{
+        instructions::CreateV1CpiBuilder,
+        types::{PrintSupply, TokenStandard},
+    },
+    token_2022::Token2022,
+};
+use mpl_bubblegum::instructions::CreateTreeConfigCpiBuilder;
 use spl_account_compression::{program::SplAccountCompression, Noop};
+
+mod utils;
+
+use utils::*;
 
 declare_id!("F7uCq1ZAShY1bjMiMMwRkMsCdpgTgwhYtaQorHE9snca");
 
@@ -33,6 +44,40 @@ pub mod bubblegum_cpi {
         cpi_create_tree.invoke()?;
         Ok(())
     }
+
+    pub fn create_collection_nft(
+        ctx: Context<CreateCollectionNft>,
+        uri: String,
+        name: String,
+    ) -> Result<()> {
+        validate_name(&name)?;
+        validate_uri(&uri)?;
+
+        let all = ctx.accounts;
+
+        let rent_info = all.rent.to_account_info();
+
+        let mut create_cpi = CreateV1CpiBuilder::new(&all.token_metadata_program);
+        create_cpi.metadata(&all.token_metadata);
+        create_cpi.mint(&all.collection_mint, true);
+        create_cpi.authority(&all.wallet);
+        create_cpi.payer(&all.payer);
+        create_cpi.update_authority(&all.wallet, false);
+        create_cpi.master_edition(Some(&all.master_edition));
+        create_cpi.system_program(&all.system_program);
+        create_cpi.sysvar_instructions(&rent_info);
+        create_cpi.spl_token_program(&all.token_program);
+        create_cpi.token_standard(TokenStandard::NonFungible);
+        create_cpi.name(name);
+        create_cpi.uri(uri);
+        create_cpi.seller_fee_basis_points(550);
+        create_cpi.token_standard(TokenStandard::NonFungible);
+        create_cpi.print_supply(PrintSupply::Zero);
+
+        create_cpi.invoke()?;
+
+        Ok(())
+    }
 }
 
 #[derive(Accounts)]
@@ -40,24 +85,76 @@ pub struct CreateTreeCpi<'info> {
     /// CHECK: will used by mpl_bubblegum program
     #[account(mut)]
     pub tree_authority: UncheckedAccount<'info>,
+    /// CHECK: Zero initialized account
     #[account(zero, signer)]
-    /// CHECK: This account must be all zeros
     pub merkle_tree: UncheckedAccount<'info>,
     #[account(mut)]
     pub payer: Signer<'info>,
     pub tree_creator: Signer<'info>,
     pub log_wrapper: Program<'info, Noop>,
     pub compression_program: Program<'info, SplAccountCompression>,
-    /// CHECK: Required to make cpi call
-    #[account(
-        address = MPL_BUBBLEGUM_ID @ BubblegumCpiError::InvalidPubkey
-    )]
-    pub mpl_bubblegum_program: UncheckedAccount<'info>,
+    pub mpl_bubblegum_program: Program<'info, MplBubblegumProgram>,
     pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CreateCollectionNft<'info> {
+    /// CHECK: Mint account create using cpi
+    #[account(mut, signer)]
+    pub collection_mint: UncheckedAccount<'info>,
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    pub wallet: SystemAccount<'info>,
+    ///CHECK: account will be used and checked by metaplex in CPI call.
+    #[account(
+        mut,
+        owner = System::id() @ BubblegumCpiError::InvalidAccountOwner,
+        constraint = token_metadata.data_is_empty() @ BubblegumCpiError::MetadataAccountAlreadyInUse
+    )]
+    pub token_metadata: UncheckedAccount<'info>,
+    ///CHECK: account will be used and checked by metaplex in CPI call.
+    #[account(
+        mut,
+        owner = System::id() @ BubblegumCpiError::InvalidAccountOwner,
+        constraint = master_edition.data_is_empty() @ BubblegumCpiError::MasterEditionAccountAlreadyInUse
+    )]
+    pub master_edition: UncheckedAccount<'info>,
+    pub token_metadata_program: Program<'info, TokenMetadataProgram>,
+    pub token_program: Program<'info, Token2022>,
+    pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
 }
 
 #[error_code]
 pub enum BubblegumCpiError {
-    #[msg("Invalid mpl bubblegum public key")]
-    InvalidPubkey,
+    #[msg("Invalid Account Owner")]
+    InvalidAccountOwner,
+    #[msg("Token Metadata account must be empty")]
+    MetadataAccountAlreadyInUse,
+    #[msg("Master edition account must be empty")]
+    MasterEditionAccountAlreadyInUse,
+    #[msg("Uri is too long")]
+    UriTooLong,
+    #[msg("Uri is invalid")]
+    InvalidUri,
+    #[msg("Nft name is invalid")]
+    InvalidNftName,
+}
+
+#[derive(Clone)]
+pub struct MplBubblegumProgram;
+
+impl anchor_lang::Id for MplBubblegumProgram {
+    fn id() -> Pubkey {
+        mpl_bubblegum::ID
+    }
+}
+
+#[derive(Clone)]
+pub struct TokenMetadataProgram;
+
+impl anchor_lang::Id for TokenMetadataProgram {
+    fn id() -> Pubkey {
+        anchor_spl::metadata::ID
+    }
 }
