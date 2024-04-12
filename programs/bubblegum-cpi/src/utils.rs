@@ -1,4 +1,4 @@
-use crate::BubblegumCpiError;
+use crate::error::*;
 use anchor_lang::prelude::*;
 use anchor_spl::metadata::mpl_token_metadata::{MAX_NAME_LENGTH, MAX_URI_LENGTH};
 use url::Url;
@@ -16,4 +16,22 @@ pub fn validate_name(name: &str) -> Result<()> {
         BubblegumCpiError::InvalidNftName
     );
     Ok(())
+}
+
+#[derive(Clone)]
+pub struct MplBubblegumProgram;
+
+impl anchor_lang::Id for MplBubblegumProgram {
+    fn id() -> Pubkey {
+        mpl_bubblegum::ID
+    }
+}
+
+#[derive(Clone)]
+pub struct TokenMetadataProgram;
+
+impl anchor_lang::Id for TokenMetadataProgram {
+    fn id() -> Pubkey {
+        anchor_spl::metadata::ID
+    }
 }
