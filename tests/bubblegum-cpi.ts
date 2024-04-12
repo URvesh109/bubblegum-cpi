@@ -12,6 +12,7 @@ import {
   airdrop,
   computeBudgetIx,
   fetchCreatorKeypair,
+  fetchEstimatePriorityFees,
   fetchFeePayerKeypair,
   fetchLeafOwnerKeypair,
   getSimulationUnits,
@@ -24,6 +25,8 @@ import {
   getAssociatedTokenAddress,
 } from "@solana/spl-token";
 import Debug from "debug";
+import { ResponseData } from "./utils/types";
+import { ComputeBudgetProgram } from "@solana/web3.js";
 
 const computeLog = Debug("compute:");
 const txIdLog = Debug("txId:");
@@ -99,6 +102,21 @@ describe("bubblegum-cpi", () => {
     computeLog("Compute units required to create bubblegum tree ", units);
 
     transaction.add(createTreeIx);
+
+    // Fetch the recent priority fees
+    const { result }: ResponseData = await fetchEstimatePriorityFees({
+      endpoint: provider.connection.rpcEndpoint,
+    });
+
+    if (result) {
+      const priorityFee = result.per_compute_unit["high"];
+
+      const priorityFeeInstruction = ComputeBudgetProgram.setComputeUnitPrice({
+        microLamports: priorityFee,
+      });
+
+      transaction.add(priorityFeeInstruction);
+    }
 
     const txId = await provider.sendAndConfirm(
       transaction,
