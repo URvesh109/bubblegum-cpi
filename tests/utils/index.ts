@@ -42,6 +42,14 @@ export const fetchFeePayerKeypair = (): anchor.web3.Keypair => {
   return feePayer;
 };
 
+export const fetchLeafOwnerKeypair = (): anchor.web3.Keypair => {
+  const leafOwner = keypairFromFile(
+    path.join(__dirname, "../../keypairs/leaf-owner.json")
+  );
+  log("leafOwner ", leafOwner.publicKey.toBase58());
+  return leafOwner;
+};
+
 export function keypairFromFile(path: string): anchor.web3.Keypair {
   return anchor.web3.Keypair.fromSecretKey(
     Uint8Array.from(
