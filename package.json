@@ -10,6 +10,7 @@
     "@metaplex-foundation/mpl-bubblegum": "^3.1.2",
     "@metaplex-foundation/umi": "^0.9.1",
     "@metaplex-foundation/umi-bundle-defaults": "^0.9.1",
+    "@solana/spl-token": "^0.4.3",
     "@solana/web3.js": "^1.91.4",
     "chai-as-promised": "^7.1.1",
     "debug": "^4.3.4"
